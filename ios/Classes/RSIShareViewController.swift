@@ -3,6 +3,7 @@
 //  receive_sharing_intent
 //
 //  Created by Kasem Mohamed on 2024-01-25.
+//  Modified by Rashad Arafeh some time after that.
 //
 
 import UIKit
@@ -13,7 +14,7 @@ import Photos
 @available(swift, introduced: 5.0)
 open class RSIShareViewController: SLComposeServiceViewController {
     var hostAppBundleIdentifier = ""
-    var appGroupId = ""
+    public var appGroupId = ""
     var sharedMedia: [SharedMediaFile] = []
 
     /// Override this method to return false if you don't want to redirect to host app automatically
@@ -21,6 +22,29 @@ open class RSIShareViewController: SLComposeServiceViewController {
     open func shouldAutoRedirect() -> Bool {
         return true
     }
+     
+    open func getSharedMediaPath() -> String {
+        // 1) First try to find any HTTP(S) URL in the paths
+        if let urlItem = sharedMedia.first(where: { media in
+            let lower = media.path.lowercased()
+            return lower.hasPrefix("http://") || lower.hasPrefix("https://")
+        }) {
+            return urlItem.path
+        }
+        // 2) Next, try to find an item whose SharedMediaType is .url
+        if let urlTypedItem = sharedMedia.first(where: { $0.type == .url }) {
+            return urlTypedItem.path
+        }
+        // 3) Fallback to a single item if there’s exactly one
+        if sharedMedia.count == 1 {
+            return sharedMedia[0].path
+        }
+        // 4) Give up
+        NSLog("⚠️ Unexpected sharedMedia count (\(sharedMedia.count)) and no HTTP(S) URL found.")
+        return ""
+    }
+
+
     
     open override func isContentValid() -> Bool {
         return true
@@ -55,6 +79,7 @@ open class RSIShareViewController: SLComposeServiceViewController {
                                 switch type {
                                 case .text:
                                     if let text = data as? String {
+                                        print("processed as string")
                                         this.handleMedia(forLiteral: text,
                                                          type: type,
                                                          index: index,
@@ -62,6 +87,7 @@ open class RSIShareViewController: SLComposeServiceViewController {
                                     }
                                 case .url:
                                     if let url = data as? URL {
+                                        print("processed as url")
                                         this.handleMedia(forLiteral: url.absoluteString,
                                                          type: type,
                                                          index: index,
@@ -146,6 +172,7 @@ open class RSIShareViewController: SLComposeServiceViewController {
     }
     
     private func handleMedia(forFile url: URL, type: SharedMediaType, index: Int, content: NSExtensionItem) {
+        print("processed as url")
         let fileName = getFileName(from: url, type: type)
         let newPath = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId)!.appendingPathComponent(fileName)
         
@@ -187,7 +214,7 @@ open class RSIShareViewController: SLComposeServiceViewController {
         userDefaults?.set(toData(data: sharedMedia), forKey: kUserDefaultsKey)
         userDefaults?.set(message, forKey: kUserDefaultsMessageKey)
         userDefaults?.synchronize()
-        redirectToHostApp()
+        //extensionContext!.completeRequest(returningItems: [], completionHandler: nil)
     }
     
     private func redirectToHostApp() {
@@ -330,3 +357,4 @@ extension URL {
         return "application/octet-stream"
     }
 }
+
